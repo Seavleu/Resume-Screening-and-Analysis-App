@@ -1,101 +1,151 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import React, { useEffect, useRef } from 'react'
+import { Button } from './components/ui/button'
+import { ChevronLeft, ChevronRight, Upload } from 'lucide-react'
+import { CandidateModal, CandidateTable, CriteriaForm, FileUpload } from './components';
+import { useAppStore } from "@/app/store/useAppStore"
+
+export default function Page() {
+  const {
+    candidates,
+    uploadedResumes,
+    criteria,
+    currentPage,
+    resumesPage,
+    selectedCandidate,
+    setCandidates,
+    setUploadedResumes,
+    setCriteria,
+    setCurrentPage,
+    setResumesPage,
+    setSelectedCandidate,
+  } = useAppStore()
+  
+  const modalRef = useRef<HTMLDivElement>(null)
+
+  const itemsPerPage = 10
+
+  // Handle criteria changes
+  const handleCriteriaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCriteria({ ...criteria, [e.target.name]: e.target.value })
+  }
+
+  // Handle file upload and parsing
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    const uploadedFiles = await mockUploadToGCS(files)
+    setUploadedResumes(uploadedFiles.map(file => file.name))
+    const parsedResumes = await mockParseResumes(uploadedFiles.map(file => file.url))
+    console.log('Parsed resumes:', parsedResumes)
+    alert(`${files.length} files uploaded and parsed.`)
+  }
+
+  // Screen resumes based on criteria
+  const handleScreenResumes = () => {
+    const skillsArray = criteria.skills.toLowerCase().split(/[,.\s]+/).filter(Boolean)
+    const screenedCandidates = candidates.map(candidate => ({
+      ...candidate,
+      match: (
+        skillsArray.some(skill => candidate.skills.toLowerCase().includes(skill)) &&
+        parseInt(candidate.experience) >= parseInt(criteria.experience || '0') &&
+        candidate.education.toLowerCase().includes(criteria.education.toLowerCase())
+      )
+    }))
+    const sortedCandidates = screenedCandidates.sort((a, b) => (a.match === b.match ? 0 : a.match ? -1 : 1))
+    setCandidates(sortedCandidates)
+    mockSendNotification('recruiter@example.com')
+    alert('Resumes screened based on criteria. Notification sent to recruiter.')
+  }
+
+  // View candidate details
+  const handleViewCandidate = (candidate: Candidate) => {
+    setSelectedCandidate(candidate)
+  }
+
+  // Export candidate details
+  const handleExportCandidate = (candidate: Candidate) => {
+    const candidateData = JSON.stringify(candidate, null, 2)
+    const blob = new Blob([candidateData], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${candidate.name.replace(' ', '_')}_resume.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // Pagination logic for candidates and resumes
+  const paginatedCandidates = candidates.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
+
+  const paginatedResumes = uploadedResumes.slice(
+    (resumesPage - 1) * itemsPerPage,
+    resumesPage * itemsPerPage
+  )
+
+  // Close candidate modal on "Escape" key press
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setSelectedCandidate(null)
+      }
+    }
+    window.addEventListener('keydown', handleEscape)
+    return () => {
+      window.removeEventListener('keydown', handleEscape)
+    }
+  }, [setSelectedCandidate])
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Resume Screening and Analysis App</h1>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      <FileUpload onUpload={handleFileUpload} />
+
+      {uploadedResumes.length > 0 && (
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold mb-2">Uploaded Resumes</h2>
+          <div className="bg-gray-100 p-4 rounded-lg">
+            {paginatedResumes.map((resume, index) => (
+              <div key={index} className="mb-1">{resume}</div>
+            ))}
+          </div>
+          {uploadedResumes.length > itemsPerPage && (
+            <div className="flex justify-between mt-2">
+              <Button onClick={() => setResumesPage(Math.max(resumesPage - 1, 1))} disabled={resumesPage === 1}>
+                <ChevronLeft className="w-4 h-4 mr-2" /> Previous
+              </Button>
+              <Button onClick={() => setResumesPage(Math.min(resumesPage + 1, Math.ceil(uploadedResumes.length / itemsPerPage)))} disabled={resumesPage === Math.ceil(uploadedResumes.length / itemsPerPage)}>
+                Next <ChevronRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+          )}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      )}
+
+      <CriteriaForm criteria={criteria} onCriteriaChange={handleCriteriaChange} />
+
+      <Button onClick={handleScreenResumes} className="mb-4">
+        <Upload className="w-4 h-4 mr-2" /> Screen Resumes
+      </Button>
+
+      <CandidateTable candidates={paginatedCandidates} onView={handleViewCandidate} onExport={handleExportCandidate} />
+
+      <div className="flex justify-between mt-4">
+        <Button onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))} disabled={currentPage === 1}>
+          <ChevronLeft className="w-4 h-4 mr-2" /> Previous
+        </Button>
+        <Button onClick={() => setCurrentPage(Math.min(currentPage + 1, Math.ceil(candidates.length / itemsPerPage)))} disabled={currentPage === Math.ceil(candidates.length / itemsPerPage)}>
+          Next <ChevronRight className="w-4 h-4 ml-2" />
+        </Button>
+      </div>
+
+      {selectedCandidate && (
+        <CandidateModal candidate={selectedCandidate} onClose={() => setSelectedCandidate(null)} />
+      )}
     </div>
-  );
+  )
 }
