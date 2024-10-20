@@ -27,7 +27,7 @@ This is a Resume Screening and Analysis platform that allows users to upload res
 - **Auth0**: For authentication and user management.
 
 ## Components
-All reusable components are stored in the `/components` directory and exported via `index.ts`.
+All reusable components are stored in the `./app/components` directory and exported via `index.ts`.
 
 - **CandidateModal**: Displays detailed information about a candidate.
 - **CandidateTable**: Renders the candidate data in a table format.
@@ -53,12 +53,12 @@ The state is managed using `Zustand`, with persistent storage for data such as u
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/resume-screening-app.git
+   git clone https://github.com/Seavleu/Resume-Screening-and-Analysis-App
    ```
 
 2. Navigate to the project directory:
    ```bash
-   cd resume-screening-app
+   cd Resume-Screening-and-Analysis-App
    ```
 
 3. Install dependencies:
